@@ -1,0 +1,266 @@
+---
+title: "Lab12"
+author: "Siddharth Bailkeri"
+format: pdf
+editor: visual
+---
+
+## 3. Import countData and colData
+```{r}
+counts <- read.csv("airway_scaledcounts.csv", row.names = 1)
+metadata <- read.csv("airway_metadata.csv")
+```
+
+Viewing both datasets:
+```{r}
+head(counts)
+head(metadata)
+```
+
+> **Q1. How many genes are in this dataset?**
+
+```{r}
+nrow(counts)
+```
+
+> There are 38,694 genes in this dataset
+
+> **Q2. How many ‘control’ cell lines do we have?**
+
+```{r}
+library(dplyr)
+nrow(metadata %>% filter(dex == "control"))
+```
+> We have 4 control cell lines. 
+
+## 4. Toy differential gene expression
+Finding the IDs of the control lines
+```{r}
+control <- metadata %>% filter(dex == "control")
+control.counts <- counts %>% select(control$id)
+control.mean <- rowSums(control.counts)/ncol(control.counts)
+head(control.mean)
+```
+
+> **Q3. How would you make the above code in either approach more robust? Is there a function that could help here?**
+> 
+> I used the dplyr approach and made it more robust by changing 4 to ncol(control.counts) to calculate the mean as this would not affect accuracy if we were to add mroe data. 
+
+> **Q4. Follow the same procedure for the treated samples (i.e. calculate the mean per gene across drug treated samples and assign to a labeled vector called treated.mean)**
+
+```{r}
+treated <- metadata %>% filter (dex == "treated")
+treated.counts <- counts %>% select(treated$id)
+treated.mean <- rowSums(treated.counts)/ncol(treated.counts)
+head(treated.mean)
+```
+
+```{r}
+meancounts <- data.frame(control.mean, treated.mean)
+colSums(meancounts)
+```
+
+> **Q5 (a). Create a scatter plot showing the mean of the treated samples against the mean of the control samples. Your plot should look something like the following.**
+
+```{r}
+plot(meancounts, xlab = "Control", ylab = "Treated")
+```
+
+> **Q5 (b).You could also use the ggplot2 package to make this figure producing the plot below. What geom_?() function would you use for this plot?**
+> 
+> geom_point()
+
+```{r}
+library(ggplot2)
+
+ggplot(meancounts) +
+  aes(x = control.mean, y = treated.mean) + 
+  geom_point(alpha = 0.4) +
+  labs(x = "Control", y = "Treated")
+```
+
+> **Q6. Try plotting both axes on a log scale. What is the argument to plot() that allows you to do this?**
+> 
+> log = xy within the plot function
+
+```{r}
+plot(meancounts, xlab = "Control", ylab = "Treated", log = "xy")
+```
+
+```{r}
+ggplot(meancounts) +
+  aes(x = control.mean, y = treated.mean) + 
+  geom_point(alpha = 0.2) +
+  labs(x = "Control", y = "Treated") + 
+  scale_x_continuous(trans = "log2") + 
+  scale_y_continuous(trans = "log2") +
+  theme_bw()
+```
+
+Filtering out the zero values:
+```{r}
+mycounts <- meancounts %>% filter(control.mean != 0, treated.mean != 0)
+head(mycounts)
+```
+
+> **Q7. What is the purpose of the arr.ind argument in the which() function call above? Why would we then take the first column of the output and need to call the unique() function?**
+>
+> the arr.ind = TRUE tells the which() function to return both row and column indexes. Using unique() ensures we don't double count any data points because they have zeros in both row and column.
+
+```{r}
+mycounts$log2fc <- log2(mycounts$treated.mean/mycounts$control.mean)
+head(mycounts)
+```
+```{r}
+up.ind <- mycounts$log2fc > 2
+down.ind <- mycounts$log2fc < (-2)
+sum(up.ind)
+sum(down.ind)
+```
+
+>**Q8. Using the up.ind vector above can you determine how many up regulated genes we have at the greater than 2 fc level?**
+>
+>250
+
+> **Q9. Using the down.ind vector above can you determine how many down regulated genes we have at the greater than 2 fc level?**
+>
+> 367
+
+> **Q10. Do you trust these results? Why or why not?**
+> 
+> I don't really trust these results because fold change looks different for different genes and we have not conducted any statistical tests to prove that >2 fold change means that the gene is up regulated, or that <-2 fold change means that it is down regulated. 
+
+## 5. Setting up for DESeq
+```{r}
+library(DESeq2)
+citation("DESeq2")
+```
+
+Importing Data
+```{r}
+dds <- DESeqDataSetFromMatrix(countData = counts, 
+                              colData = metadata,
+                              design = ~dex)
+dds
+```
+Performing the Variance Stabilizing Transformation
+```{r}
+vsd <- vst(dds, blind = FALSE)
+plotPCA(vsd, intgroup = c("dex"))
+```
+
+Using ggplot2 to plot
+```{r}
+pcaData <- plotPCA(vsd, intgroup = c("dex"), returnData = T)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+```
+```{r}
+ggplot(pcaData) + 
+  aes(x = PC1, y = PC2, color = dex) +
+  geom_point(size = 3) +
+  xlab(paste0("PC1", percentVar[1], "% variance")) + 
+  ylab(paste0("PC2", percentVar[2], "% variance")) + 
+  coord_fixed() +
+  theme_bw()
+```
+
+## 7. DESeq analysis
+```{r}
+dds <- DESeq(dds)
+res <- results(dds)
+res
+```
+
+```{r}
+summary(res)
+```
+
+```{r}
+res05 <- results(dds, alpha = 0.05)
+summary(res05)
+```
+
+## 8. Adding annotation data
+```{r}
+library("AnnotationDbi")
+library("org.Hs.eg.db")
+```
+
+```{r}
+res$symbol <- mapIds(org.Hs.eg.db,
+                     keys = row.names(res),
+                     keytype = "ENSEMBL",
+                     column = "SYMBOL",
+                     multiVals = "first")
+head(res)
+```
+
+
+```{r}
+res$entrez <- mapIds(org.Hs.eg.db,
+                     keys = row.names(res),
+                     keytype = "ENSEMBL",
+                     column = "ENTREZID",
+                     multiVals = "first")
+res$uniprot <- mapIds(org.Hs.eg.db,
+                     keys = row.names(res),
+                     keytype = "ENSEMBL",
+                     column = "UNIPROT",
+                     multiVals = "first")
+res$genename <- mapIds(org.Hs.eg.db,
+                     keys = row.names(res),
+                     keytype = "ENSEMBL",
+                     column = "GENENAME",
+                     multiVals = "first")
+head(res)
+```
+
+```{r}
+ord <- order( res$padj )
+head(res[ord,])
+```
+
+```{r}
+write.csv(res[ord,], "deseq_results.csv")
+```
+
+## 9. Data Visualization
+```{r}
+plot( res$log2FoldChange,  -log(res$padj), 
+      xlab="Log2(FoldChange)",
+      ylab="-Log(P-value)")
+```
+
+```{r}
+plot( res$log2FoldChange,  -log(res$padj), 
+ ylab="-Log(P-value)", xlab="Log2(FoldChange)")
+
+# Add some cut-off lines
+abline(v=c(-2,2), col="darkgray", lty=2)
+abline(h=-log(0.05), col="darkgray", lty=2)
+```
+
+```{r}
+mycols <- rep("gray", nrow(res))
+mycols[ abs(res$log2FoldChange) > 2 ]  <- "red" 
+
+inds <- (res$padj < 0.01) & (abs(res$log2FoldChange) > 2 )
+mycols[ inds ] <- "blue"
+
+plot( res$log2FoldChange,  -log(res$padj), 
+ col=mycols, ylab="-Log(P-value)", xlab="Log2(FoldChange)" )
+
+abline(v=c(-2,2), col="gray", lty=2)
+abline(h=-log(0.1), col="gray", lty=2)
+```
+
+```{r}
+library(EnhancedVolcano)
+
+x <- as.data.frame(res)
+EnhancedVolcano(x,
+                lab = x$symbol,
+                x = "log2FoldChange",
+                y = "pvalue")
+```
+
