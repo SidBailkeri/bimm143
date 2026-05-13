@@ -1,0 +1,397 @@
+---
+title: "Lab07"
+author: "Siddharth Bailkeri"
+format: pdf
+editor: visual
+---
+
+## k-means analyis
+
+Generating some data
+
+```{r}
+temp_x <- c(rnorm(15,-2), rnorm(15, 2))
+temp_y <- c(rnorm(15,2), rnorm(15, -2))
+
+df <- cbind(x = temp_x, y = temp_y)
+plot(df)
+```
+
+k-means clustering analysis
+
+```{r}
+km <- kmeans(df, centers = 2, nstart = 20)
+km
+```
+
+**Q: Number of points per cluster**
+
+```{r}
+km$size
+```
+
+Q: Cluster Size?: km\$size
+
+Q: Cluster assignment
+
+```{r}
+km$cluster
+```
+
+```{r}
+table(km$cluster)
+```
+
+Q: Cluster center?
+
+```{r}
+km$centers
+```
+
+Plotting k-means clustering using base-R:
+
+```{r}
+plot(df, col = c("red", "black")[km$cluster])
+points(km$centers, col = "blue", pch = "X")
+```
+
+Plotting k-means clustering using ggplot:
+
+```{r}
+library(ggplot2)
+ggplot(df) + 
+  aes(x = x, y = y, color = factor(km$cluster)) +
+  geom_point() +
+  scale_color_manual(values = c("black", "red")) +
+  geom_point(data = km$centers, 
+             color = "blue", 
+             aes(x = x, y = y), 
+             shape = "X", 
+             size = 3)
+```
+
+## Hierarchical clustering analysis
+
+Analysis by hclust()
+
+```{r}
+dm <- dist(df)
+#dm
+```
+
+```{r}
+hc <- hclust(d = dm)
+hc
+```
+
+Plotting with base-R
+
+```{r}
+plot(hc)
+abline(h = 5, col = "red")
+
+```
+
+Retrieving clusters from hclust() using cutree:
+
+```{r}
+cutree(hc, h = 6)
+table(cutree(hc, h = 6))
+```
+
+Using cutree() to cut by k:
+
+```{r}
+cutree(hc, k = 2)
+```
+
+```{r}
+cutree(hc, k = 4)
+```
+
+```{r}
+plot(df, col = cutree(hc, k = 2))
+```
+
+## PCA of Food UK data:
+
+reading in data:
+
+```{r}
+x <- read.csv("UK_foods.csv", row.names = 1)
+```
+
+> **Q1 : How many rows and columns?**
+
+```{r}
+dim(x)
+```
+
+```{r}
+#View(x)
+#rownames(x) <- x[,1]
+#x <- x[ , -1]
+#dim(x)
+```
+
+> **Q2: Which approach to solving the ‘row-names problem’ mentioned above do you prefer and why? Is one approach more robust than another under certain circumstances?** I prefer the second approach, of adding it in the read.csv() function because if we rerun the code block above multiple times it will probably start renaming the columns by each column. i.e. the column titled "England" is now \[ , 1\] so the next time we run it, this column will become the titles column and so on.
+
+Creating a bar plot using base-R:
+
+```{r}
+barplot(as.matrix(x), beside=T, col=rainbow(nrow(x)))
+```
+
+> **Q3: Changing what optional argument in the above barplot() function results in the following plot?**
+
+```{r}
+barplot(as.matrix(x), beside=F, col=rainbow(nrow(x)))
+#specifying beside = F tells R that the respective labels should not be 
+#plotted beside each other but should instead be stacked.
+```
+
+tidying using tidyR to create a longer dataset:
+
+```{r}
+library(tidyr)
+# Convert data to long format for ggplot with `pivot_longer()`
+x_long <- x |> 
+          tibble::rownames_to_column("Food") |> 
+          pivot_longer(cols = -Food, 
+                       names_to = "Country", 
+                       values_to = "Consumption")
+
+dim(x_long)
+```
+
+making the plot using ggplot:
+
+```{r}
+library(ggplot2)
+ggplot(x_long) +
+  aes(x = Country, y = Consumption, fill = Food) +
+  geom_col(position = position_dodge())
+#the position = position_dodge() code indicates that the bars in the plot 
+#should be side by side and not stacked.
+```
+
+> **Q4: Changing what optional argument in the above ggplot() code results in a stacked barplot figure?**
+
+```{r}
+ggplot(x_long) +
+  aes(x = Country, y = Consumption, fill = Food) +
+  geom_col()
+#since the default positioning is stacked, removing the 
+#position = position_dodge() code reverts it to the default positioning
+#and makes the plot stacked. 
+```
+
+> **Q5: We can use the pairs() function to generate all pairwise plots for our countries. Can you make sense of the following code and resulting figure? What does it mean if a given point lies on the diagonal for a given plot?**
+
+```{r}
+pairs(x, col=rainbow(nrow(x)), pch=16)
+```
+
+> The pairs() function generates plots for eery pair of variables. If a point falls on the diagonal for this plot, it means that this value is equal for both countries.
+
+creating heatmaps:
+
+```{r}
+library(pheatmap)
+
+pheatmap(as.matrix(x))
+```
+
+> **Q6. Based on the pairs and heatmap figures, which countries cluster together and what does this suggest about their food consumption patterns? Can you easily tell what the main differences between N. Ireland and the other countries of the UK in terms of this data-set?** Based on the heatmap, England and Wales cluster together closest, followed by Scotland and then north Ireland. No we cannot easily tell what the differences are between N. Ireland and othe rcountries because the consumptions look mostly similar in colouring for the heatmap.
+
+transposing our matrix for principal component analysis:
+
+```{r}
+pca <- prcomp(t(x))
+summary(pca)
+```
+
+> **Q7. Complete the code below to generate a plot of PC1 vs PC2. The second line adds text labels over the data points.**
+
+```{r}
+# Create a data frame for plotting
+df <- as.data.frame(pca$x)
+df$Country <- rownames(df)
+
+# Plot PC1 vs PC2 with ggplot
+ggplot(pca$x) +
+  aes(x = PC1, y = PC2, label = rownames(pca$x)) +
+  geom_point(size = 3) +
+  geom_text(vjust = -0.5) +
+  xlim(-270, 500) +
+  xlab("PC1") +
+  ylab("PC2") +
+  theme_bw()
+```
+
+> **Q8. Customize your plot so that the colors of the country names match the colors in our UK and Ireland map and table at start of this document.**
+
+```{r}
+mycolors <- c("orange", "red", "blue", "darkgreen")
+
+ggplot(pca$x) +
+  aes(x = PC1, y = PC2, label = rownames(pca$x)) +
+  geom_point(size = 3, color = "grey") +
+  geom_text(vjust = -0.5, color = mycolors) +
+  xlim(-270, 500) +
+  xlab("PC1") +
+  ylab("PC2") +
+  theme_bw()
+```
+
+calculating how much variation is accounted for:
+
+```{r}
+v <- round(pca$sdev^2/sum(pca$sdev^2)*100, )
+v
+```
+
+```{r}
+z <- summary(pca)
+z$importance
+```
+
+Creating a scree plot
+
+```{r}
+# Create scree plot with ggplot
+variance_df <- data.frame(
+  PC = factor(paste0("PC", 1:length(v)), levels = paste0("PC", 1:length(v))),
+  Variance = v
+)
+
+ggplot(variance_df) +
+  aes(x = PC, y = Variance) +
+  geom_col(fill = "steelblue") +
+  xlab("Principal Component") +
+  ylab("Percent Variation") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 0))
+```
+
+generating a loading plot:
+
+```{r}
+ggplot(pca$rotation) +
+  aes(x = PC1, 
+      y = reorder(rownames(pca$rotation), PC1)) +
+  geom_col(fill = "tan") +
+  theme_bw() +
+  labs(x = "PC1 Loading Score", y = "") +
+  theme(axis.text.y = element_text(size = 9))
+```
+
+> **Q9: Generate a similar ‘loadings plot’ for PC2. What two food groups feature prominantely and what does PC2 maninly tell us about?**
+
+```{r}
+ggplot(pca$rotation) +
+  aes(x = PC2, y = reorder(rownames(pca$rotation), PC2)) +
+  geom_col(fill = "steelblue4") +
+  labs(x = "PC2 Loading Score", y = "") +
+  theme(axis.text.y = element_text(size = 9))
+```
+
+> PC2 mainly tells us about which factors differentiate Scotland and Wales. Here, we see that soft drink consumption pushes Scotland higher up on the y - axis, while Fresh potato consumption psuhes Wales to the lower end of the y - axis.
+
+## PCA of RNA-seq data (optional extra credit section)
+
+reading in the data
+
+```{r}
+rna.data <- read.csv("expression.csv", row.names = 1)
+head(rna.data, n = 6)
+```
+
+> **Q10: How many genes and samples are in this data set? How many PCs do you think it will take to have a useful overview of this data set (see below)?**
+
+```{r}
+dim(rna.data)
+```
+
+> We would need about 3 principal components to have a useful overview of the data
+
+performing the pca:
+
+```{r}
+pca.rna <- prcomp(t(rna.data), scale = TRUE)
+
+df.rna <- as.data.frame(pca.rna$x)
+df.rna$Sample <- rownames(df.rna)
+
+ggplot(df.rna) +
+  aes(x = PC1, y = PC2, label = Sample) + 
+  geom_point() +
+  geom_text(vjust = -0.5, size = 3) +
+  labs(x = "PC1", y = "PC2") +
+  theme_bw()
+  
+```
+
+viewing the importance:
+
+```{r}
+summary(pca.rna)$importance
+```
+
+plotting a scree plot:
+
+```{r}
+#calculating the variance and %variance
+pca.rna.var <- pca.rna$sdev^2
+pca.rna.var.per <- round(pca.rna.var/sum(pca.rna.var)*100, 1)
+
+#creating the data frame for the scree plot
+scree.df <- data.frame(
+  PC = factor(paste0("PC", 1:10), levels = paste0("PC", 1:10)), 
+  Variance = pca.rna.var.per[1:10]
+)
+
+#creating the scree plot
+ggplot(scree.df) +
+  aes(x = PC, y = Variance) +
+  geom_col(fill = "steelblue1") +
+  labs(title = "Scree plot of PCA of RNA data", 
+       x = "Principal Component", 
+       y = "Percent Variance") +
+  theme_bw()
+```
+
+Adding the details from the loading plots to the PCA plot:
+
+```{r}
+## A vector of colors for wt and ko samples
+colvec <- colnames(rna.data)
+colvec[grep("wt", colvec)] <- "red"
+colvec[grep("ko", colvec)] <- "blue"
+
+# Add condition to data frame
+df.rna$condition <- substr(df.rna$Sample, 1, 2)
+df.rna$color <- colvec
+
+ggplot(df.rna) +
+  aes(x = PC1, y = PC2, color = color, label = Sample) +
+  geom_point(size = 3) +
+  geom_text(vjust = -0.5, hjust = 0.5, show.legend = FALSE) +
+  scale_color_identity() +
+  xlab(paste0("PC1 (", pca.rna.var.per[1], "%)")) +
+  ylab(paste0("PC2 (", pca.rna.var.per[2], "%)")) +
+  theme_bw()
+```
+
+```{r}
+loading_scores <- pca.rna$rotation[,1]
+
+## Find the top 10 measurements (genes) that contribute
+## most to PC1 in either direction (+ or -)
+gene_scores <- abs(loading_scores) 
+gene_score_ranked <- sort(gene_scores, decreasing=TRUE)
+
+## show the names of the top 10 genes
+top_10_genes <- names(gene_score_ranked[1:10])
+top_10_genes 
+```

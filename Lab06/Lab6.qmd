@@ -1,0 +1,153 @@
+---
+title: "Lab06"
+author: "Siddharth Bailkeri"
+format: pdf
+editor: visual
+---
+
+#### Q1:Write a function add() to add some numbers together. Make sure to add comment(s) to the function explaining why you do things.
+
+> **Q1 a) Your first version of the function should add two input numbers together; e.g. add(4, 7) should return 11**
+
+```{r}
+add_2 <- function(x,y) {
+  #Using the variables x and y, along with the function()
+  #option creates a function that adds the two.
+  x + y}
+#testing the function:
+add_2(1000, 2345)
+```
+
+**Making the function automatically using the "extract function" option in RStudio:**
+
+```{r}
+add_two <- function(x, y) {
+  x+y
+}
+#testing add_two()
+add_two(2345, 3456)
+```
+
+> **Q1 b) Your second version of the function should add any numbers together that the user inputs; e.g. add(1, 2, 3, -4) should return 2**
+
+```{r}
+add_multi <- function(x, ...) {
+  sum(x,...)
+}
+add_multi(23445, 578909, 4890)
+```
+
+#### Q2: Write a function generate_dna() that generates a random DNA sequence of a length input by the user; e.g. generate_dna(11) may return "ATTTAAGGCTG". Make sure to add comments to the function. Play with functions sample() and paste() in your R-Studio Console to see how they can help here.
+
+```{r}
+# here, function(n) tells R that "n" - the number of nucelotides - is the 
+#input for the function generate_dna()
+generate_dna <- function(n) {
+  # the first argument of the sample() function is the vector from 
+  #which the output is sampled from. n is the input from the
+  #generate_dna() function that will direct how many bp will be in 
+  #the output. replace = true allows R to resample from the same 4 
+  #nucleotides so we can have repitition of a nucelotide.
+  dna <- sample(c("A", "T", "G", "C"), n, replace = TRUE)
+  # using paste() allows us to concatenate the output from the sample() 
+  #function into a singular string. collapse tells R to give the output 
+  #with no spaces in between. 
+  paste(dna, collapse = "" )}
+# testing the function:
+generate_dna(11)
+```
+
+#### Q3: Write a function generate_protein() that generates a random peptide/protein sequence of a length input by the user; e.g. generate_protein(6) may return "WQRTAG". Make sure to use the single-letter code for all 20 amino acids and use no other letters (see list of amino acids at the bottom of the page); make sure that individual amino acids can appear more than once. Make sure to add comments to the function
+
+```{r}
+generate_protein <- function(n) {
+  # creating a vector amino_acids that contains the single letter codes 
+  #for all amino acids
+  amino_acids <- c("A", "R", "N", "D", "C", "E", "Q", "G", "H", "I", "L", 
+                  "K", "M", "F", "P", "S", "T", "W", "Y","V")
+  # creating a random sample of amino acids with repitition allowed
+  protein <- sample(amino_acids, n, replace = TRUE)
+  # concatenating the character output from the random sample into one single 
+  #continuous string
+  paste(protein, collapse = "")
+}
+#testing the function:
+generate_protein(6)
+```
+
+#### Q4: Use your generate_protein() function to generate peptides of lengths 5, 7, 9, and 11 amino acids. Take advantage of the base R function sapply() for this.
+
+```{r}
+sapply(c(5, 7, 9, 11), generate_protein)
+```
+
+#### Q5: Take each of your peptides from Q4 and run a BLASTP search selecting the Non-redundant protein sequences (nr) database and homo sapiens (taxid: 9606) organism. For each search, before clicking BLAST check the Show results in a new window tab next to the BLAST button to easily allow you to run the blast search for all four peptides at the same time in four different tabs. Once each search is done, for the top aligned protein for each peptide, list the percent identity (Per. Ident) times coverage (Query Cover) (for example, in the example below, 100% Query Cover times 85.71% Per. Ident = 100% x 85.71% = 1.00 x 0.8571 x 100% = 85.71%); make sure to type out your calculations in your Quarto document \[note: if any of your values are below 30% you are probably miscalculating something\]. Upload your numbers for each peptide (length (aa) and max identity (%)) into the shared class excel data sheet (see Data Sheet link in the Canvas assignment). Also, for each datapoint, add your initials in the "Your_Initials" column of the data sheet. Before adding your initials, scan through other used initials; if anyone has the same initials as you, modify your initials to make them unique
+
+```{r}
+# here, I multiply query cover with percent identity as decimals and 
+#then multiply each by 100 to obtain a percentage
+five_aa <- print((0.80 * 1)*100)
+seven_aa <- print((0.8571 * 1)*100)
+nine_aa <- print((0.8571 * 0.78)*100)
+eleven_aa <- print((1 * 0.64)*100)
+```
+
+#### Q6: Once there is a good amount of data in the shared excel sheet, export the sheet as a CSV UTF-8 file (Export option under the File tab) and save the file to your class working folder. In R-Studio, upload the csv file into a data frame using the command peptide_df \<- read.csv("your_filename"). Use the head() function to list the first 10 rows (note that the default for head() is 6) of the peptide_df dataframe as a test that everything looks good.
+
+```{r}
+peptide_df <- read.csv("BIMM143_peptide.csv")
+head(peptide_df, n = 10)
+```
+
+```{r}
+# quick filtering to remove blanks in the data
+library(dplyr)
+peptide_df_clean <- peptide_df %>% filter(Max_Identity_perc != "")
+```
+
+#### Q7: Use ggplot2 to generate a box plot with Length_aa on the x-axis and Max_Identity_perc on the y-axis. Since the box plot will require categorical values for Length_aa, you may have to specify the x-axis as as.factor(Length_aa). Feel free to pretty up the plot by adding your own x/y-axis labels, graph title, etc using the labs() function and/or using your favorite theme using a theme() function (see the data-visualization_ggplot.pdf cheat sheet in Canvas for options). Optional: you will reuse this plot a few times below, so your subsequent coding will be simpler if you assign your box plot to an object such as 'p' (p \<- ggplot(peptide_df) +....etc).
+
+```{r}
+library(ggplot2)
+plot_peptides <- ggplot(peptide_df_clean) +
+  aes(x = factor(Length_aa), y = Max_Identity_perc) + 
+  geom_boxplot(outliers = FALSE) +
+  labs(title = "Amino Acid Length and Percent Identity", 
+       x = "Length of Amino Acid", 
+       y = "Maximum Identity Percent") +
+  theme_bw()
+plot_peptides
+```
+
+#### Q8: Let's add a geom_jitter() layer to your box plot to visualize the individual data points on top of the box plot and highlight your own data points.
+
+> **a. First, add a geom_jitter() layer to your box plot with each data point colored according to students' initials by adding the following additional line to your plot: + geom_jitter(aes(col=Your_Initials)). Feel free to narrow the spread of the jitter points using the width argument (e.g. width = 0.2). You can find your own datapoints this way via the color legend, but it looks rather messy.**
+
+```{r}
+plot_peptides + geom_jitter(aes(col=Your_Initials), width = 0.2)
+
+```
+
+> **b. Now let's control the coloring ourselves to better highlight your own data points. We can do this by generating a vector with a color for each datapoint (we will use your favorite color for your datapoints and "GREY" for all other datapoints). Y ou can then use this vector to assign colors with the geom_jitter() call.**
+
+```{r}
+color <- c(rep("GRAY", dim(peptide_df_clean)[1]))
+table(color)
+mydata <- peptide_df_clean$Your_Initials == "SKB"
+table(mydata)
+color[mydata] <- "red"
+table(color)
+```
+
+```{r}
+plot_peptides + geom_jitter(color = color, width = 0.4,
+                            alpha = 0.6)
+```
+
+> **c. Based on your boxplot, does any of your own peptide data fall outside the 25 to 75 percentile of the class's data? If yes, list which one(s):**
+>
+> Yes, my data point that corresponds to the 5 amino acid sequence lies outside the 25 to 75 percentile range of the class' data.
+
+#### Q9: MHC class II molecules of our immune system display 9 amino acid peptides on the surface of immune cells that, when from a foreign origin, activates a T-cell immune response. Based on your findings in Q7 and 8, speculate why those peptides are 9 amino acids long rather than, say, 5 amino acids?
+
+From our plots above, we see that peptides 5 amino acids long have an average percent identity of 100% so it is much more likely for there to be false positive matches, and it could result in an anti-self antibody which could cause autoimmunity. Additionally, mounting an immune response requires a lot of energy and false positive matches would result in a waste of this energy. To prevent these false positive matches, MHC class II molecules probably use longer peptides that are more likely to be specific to foreign antigens.
